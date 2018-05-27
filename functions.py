@@ -3,6 +3,13 @@
 # positve_images := folder for positive images
 # negative_images := folder for negative imgages
 # annotations.json := in current directory
+
+POS_IMAGES_PATH = 'positive_images'
+NEG_IMAGES_PATH = 'negative_images'
+SAMPLE_IMAGES_PATH = 'sample_images'
+
+import os
+import sys
 ########################################################################
 
 
@@ -59,10 +66,17 @@ def gen_labels():
 #########################################################################   
 #                               John's Code                             #                                                               #
 #########################################################################   
-def read_img_data(N=100, img_height=100, img_width=100, n_channels=3):
+import imageio
+from PIL import Image
+import json
+import numpy as np
+from matplotlib import pyplot as plt
+
+def read_img_data(N, img_height=100, img_width=100):
     """
         Inputs:
-         N := the number of images to read
+         N := number of images to read
+         img_height, img_width := height and width of images to resize to
 
         Outputs:
          X := Numpy Array of shape (N, img_height, img, width, n_channels).
@@ -100,6 +114,42 @@ def read_img_data(N=100, img_height=100, img_width=100, n_channels=3):
             
          return X, Joint_Coords, Hand_Info
     """  
+    X = np.zeros((N, img_height, img_width, 3))
+    Y = np.zeros((N,))
+    Hand_Info = np.zeros((N, ))
+
+    # Read annotations.json
+    J = read_joints()
+
+    img_dir = os.path.join(POS_IMAGES_PATH)
+    c = 0
+    for item in os.listdir(img_dir):
+        if c >= N:
+            break
+
+        # Check if left or right hand
+        f, ext = os.path.splitext(item)
+        if (f+'_L' in J):
+            print('Left Hand')
+            Hand_Info[c] = 0.
+        elif (f+'_R' in J):
+            print('Right Hand')
+            Hand_Info[c] = 1.
+        else:
+            print('Not Left nor Right!')
+
+        # Read the image and resize. Store as numpy array.
+        img_file = os.path.join(img_dir, item)
+        if os.path.isfile(img_file):
+            im = Image.open(img_file)
+            im_resized = im.resize((img_height, img_width), Image.ANTIALIAS)
+            X[c] = np.array(im_resized)
+            Y[c] = 1.
+            c += 1
+
+    #### TODO: Implement above for Negatives Folder ####
+
+    return X, Y, Hand_Info
 
 
 def read_joints():
@@ -110,10 +160,12 @@ def read_joints():
     joint_dict := dictionary of joint locations. 
                       Format { "im name" : numpy array (21, 2)}
 
-    Pseudocode:
-    just read json and covert items to numpy array
-
     """
+    with open('annotation.json') as f:
+        joint_data = json.load(f)
+
+    return joint_data
+
  
 
 def split_data(X):
