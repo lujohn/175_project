@@ -11,6 +11,8 @@ SAMPLE_IMAGES_PATH = 'sample_images'
 import os
 import sys
 import math
+from sklearn.model_selection import train_test_split
+
 ########################################################################
 
 
@@ -227,10 +229,18 @@ def read_joints():
     return joint_data
 
 
-def split_data(X):
-    """
-    blah
-    """
+
+def split(X, Y, N):
+    #N = Number of images in total
+    values = np.random.permutation(N)
+    new_x = X[values]
+    new_y = Y[values]
+    
+    x, X_test, y, Y_test =  train_test_split(new_x, new_y, test_size = .20, random_state = 42)
+    X_train, X_val, Y_train, Y_val = train_test_split(x, y, test_size = .20, random_state = 42)
+    
+    return X_train, X_test,X_val, Y_val, Y_train, Y_test
+
 
 
 ############################### Other Functions ##########################
