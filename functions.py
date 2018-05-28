@@ -10,6 +10,7 @@ SAMPLE_IMAGES_PATH = 'sample_images'
 
 import os
 import sys
+import math
 ########################################################################
 
 
@@ -42,24 +43,58 @@ def resize(path):
 
 
 #def gen_labels(json_dict, g_size, Positive = True):
-def gen_labels():
-    grid_size = 3
-    v_length = 5
-    labels = torch.randn(10,grid_size, grid_size, v_length)
+def gen_labels(Y, Joints, grid_size=3):
+    """
+    Inputs:
+         Y := numpy array of shape (N, ) indicating if hand is present
+         Joints := numpy array of shape (N, 21, 2) of joint coordinates
+
+    Outputs:
+        Labels := numpy array of shape (N, grid_size, grid_size, len(y))
+    """
+    # grid_size = 3
+    # v_length = 5
+    # labels = torch.randn(10,grid_size, grid_size, v_length)
+    N = len(Y)
+    labels = np.zeros((N, grid_size, grid_size, 5))
     #json_dict = {"img1":  [(1,2), (3,4), (5,6),(7,8), (9,6), (4,67), (23,4), (30,45), ()]}
     #Assuming that joints are in order
-    for image in list_:            #better if image is a number
-        left = json[image][17]
-        right = json[image][2]
-        top = json[image][12]
-        down = json[image][0]
-        bx = (right-left)/2
-        by = (down -top)/2
-        bw= abs(left - right)
-        bh = abs(top-down)
-        labels[image]
-        
+    # for image in list_:            #better if image is a number
+    #     left = json[image][17]
+    #     right = json[image][2]
+    #     top = json[image][12]
+    #     down = json[image][0]
+    #     bx = (right-left)/2
+    #     by = (down -top)/2
+    #     bw= abs(left - right)
+    #     bh = abs(top-down)
+    #     labels[image]
     
+
+
+    for c, joints in enumerate(Joints):
+        min_x, min_y = joints.min(axis=0) / np.array([1920, 1080])
+        max_x, max_y = joints.max(axis=0) / np.array([1920, 1080])
+        # print('min_x', min_x)
+        # print('max_x', max_x)
+        # print('min_y', min_y)
+        # print('max_y', max_y)
+
+        height = max_y - min_y
+        width = max_x - min_x
+        center_x = min_x + width / 2.
+        center_y = min_y + height / 2.
+
+        # print('height', height)
+        # print('width', width)
+        # print('center_x', center_x)
+        # print('center_y', center_y)
+
+        grid_idx_x = math.floor(center_x * grid_size) 
+        grid_idx_y = math.floor(center_y * grid_size)
+
+        labels[c][grid_idx_y][grid_idx_x] = np.array([Y[c], center_x, center_y, height, width])
+
     return labels
 
 
@@ -112,10 +147,11 @@ def read_img_data(N, img_height=100, img_width=100):
             Joint_Coords[i] = bunch of don't cares
             Hand_Info[i] = -10 # Don't Care for negative images
             
-         return X, Joint_Coords, Hand_Info
+         return X, Y, Joint_Coords, Hand_Info
     """  
     X = np.zeros((N, img_height, img_width, 3))
     Y = np.zeros((N,))
+    Joint_Coords = np.zeros((N, 21, 2))
     Hand_Info = np.zeros((N, ))
 
     # Read annotations.json
@@ -129,12 +165,17 @@ def read_img_data(N, img_height=100, img_width=100):
 
         # Check if left or right hand
         f, ext = os.path.splitext(item)
+        print(f)
         if (f+'_L' in J):
-            print('Left Hand')
+            # assert (f+'_R' not in J), f+'_R'+' also found in J'
+            # print('Left Hand')
             Hand_Info[c] = 0.
+            Joint_Coords[c] = J[f+'_L']
         elif (f+'_R' in J):
-            print('Right Hand')
+            assert (f+'_L' not in J), f+'_L'+' also found in J'
+            # print('Right Hand')
             Hand_Info[c] = 1.
+            Joint_Coords[c] = J[f+'_R']
         else:
             print('Not Left nor Right!')
 
@@ -149,7 +190,7 @@ def read_img_data(N, img_height=100, img_width=100):
 
     #### TODO: Implement above for Negatives Folder ####
 
-    return X, Y, Hand_Info
+    return X, Y, Joint_Coords, Hand_Info
 
 
 def read_joints():
