@@ -149,6 +149,9 @@ def read_img_data(N, img_height=100, img_width=100):
             
          return X, Y, Joint_Coords, Hand_Info
     """  
+
+    N_pos = N // 2  # num positive images to read
+    N_neg = N - N_pos  # num negative images to read
     X = np.zeros((N, img_height, img_width, 3))
     Y = np.zeros((N,))
     Joint_Coords = np.zeros((N, 21, 2))
@@ -157,10 +160,11 @@ def read_img_data(N, img_height=100, img_width=100):
     # Read annotations.json
     J = read_joints()
 
-    img_dir = os.path.join(POS_IMAGES_PATH)
+    # Read Positive Images
+    img_dir = POS_IMAGES_PATH
     c = 0
     for item in os.listdir(img_dir):
-        if c >= N:
+        if c >= N_pos:
             break
 
         # Check if left or right hand
@@ -188,7 +192,22 @@ def read_img_data(N, img_height=100, img_width=100):
             Y[c] = 1.
             c += 1
 
-    #### TODO: Implement above for Negatives Folder ####
+    # Read Negative Images
+    neg_img_dir = NEG_IMAGES_PATH
+    for item in os.listdir(neg_img_dir):
+        if c >= N:
+            break
+        # Read the image and resize. Store as numpy array.
+        neg_img_file = os.path.join(neg_img_dir, item)
+        if os.path.isfile(neg_img_file):
+            print(neg_img_file)
+            im = Image.open(neg_img_file)
+            im_resized = im.resize((img_height, img_width), Image.ANTIALIAS)
+            X[c] = np.array(im_resized)
+            Y[c] = 1.
+            c += 1
+
+
 
     return X, Y, Joint_Coords, Hand_Info
 
@@ -207,9 +226,24 @@ def read_joints():
 
     return joint_data
 
- 
 
 def split_data(X):
     """
     blah
     """
+
+
+############################### Other Functions ##########################
+def unpickle(file):
+    import pickle
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+    return dict
+
+def gen_negative_images():
+    cifar10_dict = unpickle('cifar-10-batches-py/data_batch_1')
+    cifar_imgs = cifar10_dict[b'data']
+    cifar_imgs = cifar_imgs.reshape(10000, 3, 32, 32).transpose(0,2,3,1).astype("uint8")
+    for i,img in enumerate(cifar_imgs):
+        im = Image.fromarray(img)
+        im.save('negative_images/'+str(i)+'.jpg')
