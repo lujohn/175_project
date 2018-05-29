@@ -242,8 +242,42 @@ def split(X, Y, N):
     return X_train, X_test,X_val, Y_val, Y_train, Y_test
 
 
+############################# Plotting Functions #########################
+def plot_bounding_box(img, cx, cy, w, h, hand=None):
+    """
+    Inputs:
+        img := numpy array of shape (img_height, img_width, n_channels)
+        cx, cy, w, h := coordinates of hand and width and height (0,1) scale
+        hand := If not none, then either 0 or 1 indicating which hand. 0 for 'left' 1 for 'right'
+    """
+    img_h, img_w = img.shape[0], img.shape[1]
+    box_top_left_x, box_top_left_y = (cx-w/2)*img_h, (cy-h/2)*img_h
+    box_h, box_w = h*img_h, w*img_w
+    fig, ax = plt.subplots()
+    plt.imshow(img.astype(np.uint8))
+    plt.plot(cx*img_w, cy*img_h, color='g', marker='o', markersize='2')
+    r = plt.Rectangle((box_top_left_x, box_top_left_y), box_w, box_h, edgecolor='r', facecolor='none')
+    ax.add_artist(r)
 
+    # Plot hand label
+    if hand == 0:
+        fig.text(cx, cy, 'Left', fontsize=8, bbox=dict(facecolor='gray', alpha=0.5))
+    elif hand == 1:
+        fig.text(cx, cy, 'right', fontsize=8, bbox=dict(facecolor='gray', alpha=0.5))
+
+    plt.show()
 ############################### Other Functions ##########################
+def to_channels_first(X):
+    """
+    Inputs:
+        X := numpy array of images in channels last order (N, h, w, channels)
+    Outputs:
+        X_rolled := Channels first array of images (channels, N, h, w)
+    """
+    X_rolled = np.rollaxis(X, axis=3)
+    X_rolled = np.rollaxis(X_rolled, axis=1)
+    return X_rolled
+
 def unpickle(file):
     import pickle
     with open(file, 'rb') as fo:
