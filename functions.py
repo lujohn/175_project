@@ -95,7 +95,7 @@ def gen_labels(Y, Joints, grid_size=3):
         grid_idx_x = math.floor(center_x * grid_size) 
         grid_idx_y = math.floor(center_y * grid_size)
 
-        labels[c][grid_idx_y][grid_idx_x] = np.array([Y[c], center_x, center_y, height, width])
+        labels[c][grid_idx_y][grid_idx_x] = np.array([Y[c], center_x, center_y, width, height])
 
     return labels
 
@@ -152,8 +152,8 @@ def read_img_data(N, img_height=100, img_width=100):
          return X, Y, Joint_Coords, Hand_Info
     """  
 
-    N_pos = N // 2  # num positive images to read
-    N_neg = N - N_pos  # num negative images to read
+    N_pos = N #// 2  # num positive images to read
+    # N_neg = N - N_pos  # num negative images to read
     X = np.zeros((N, img_height, img_width, 3))
     Y = np.zeros((N,))
     Joint_Coords = np.zeros((N, 21, 2))
@@ -171,7 +171,7 @@ def read_img_data(N, img_height=100, img_width=100):
 
         # Check if left or right hand
         f, ext = os.path.splitext(item)
-        print(f)
+        # print(f)
         if (f+'_L' in J):
             # assert (f+'_R' not in J), f+'_R'+' also found in J'
             # print('Left Hand')
@@ -206,7 +206,7 @@ def read_img_data(N, img_height=100, img_width=100):
             im = Image.open(neg_img_file)
             im_resized = im.resize((img_height, img_width), Image.ANTIALIAS)
             X[c] = np.array(im_resized)
-            Y[c] = 1.
+            Y[c] = 0.
             c += 1
 
 
