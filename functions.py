@@ -4,7 +4,7 @@
 # negative_images := folder for negative imgages
 # annotations.json := in current directory
 
-POS_IMAGES_PATH = 'positive_images'
+POS_IMAGES_PATH = 'positive_images_resized'
 NEG_IMAGES_PATH = 'negative_images'
 SAMPLE_IMAGES_PATH = 'sample_images'
 
@@ -13,36 +13,17 @@ import sys
 import math
 from sklearn.model_selection import train_test_split
 
+
+
+IMG_WIDTH = 1920
+IMG_HEIGHT = 1080
+
 ########################################################################
 
 
 #########################################################################   
 #                               Zarins's Code                           #                                                               #
 #########################################################################   
-
-def resize(path):
-    #path = "C:/Users/zarin/Desktop/Dataset/Color/"
-    dirs = os.listdir( path )
-    c =0
-    for item in dirs:
-        if os.path.isfile(path+item):
-            c+=1
-            im = Image.open(path+item)
-            print(im.size)
-            f, e = os.path.splitext(path+item)
-            print(f)
-            print(e)
-            #break
-            imResize = im.resize((100,100), Image.ANTIALIAS)
-            print(imResize)
-            imResize.show()
-            imResize.save('C:/Users/zarin/Desktop/abc' + str(c)+' resized.jpg', 'JPEG', quality=90)
-            if c == 3:
-                break
-
-        #imResize.save(f + ' resized.jpg', 'JPEG', quality=90) <------------f is the path can change it to have a good name
-    return c
-
 
 #def gen_labels(json_dict, g_size, Positive = True):
 def gen_labels(Y, Joints, grid_size=3):
@@ -71,31 +52,60 @@ def gen_labels(Y, Joints, grid_size=3):
     #     bw= abs(left - right)
     #     bh = abs(top-down)
     #     labels[image]
-    
 
-
+    grid_width = IMG_WIDTH / grid_size
+    grid_height = IMG_HEIGHT / grid_size
     for c, joints in enumerate(Joints):
-        min_x, min_y = joints.min(axis=0) / np.array([1920, 1080])
-        max_x, max_y = joints.max(axis=0) / np.array([1920, 1080])
-        # print('min_x', min_x)
-        # print('max_x', max_x)
-        # print('min_y', min_y)
-        # print('max_y', max_y)
+        # Get min and max locations from raw image
+        min_x, min_y = joints.min(axis=0)
+        max_x, max_y = joints.max(axis=0)
 
+        # Calculate width, height, and center
         height = max_y - min_y
         width = max_x - min_x
         center_x = min_x + width / 2.
         center_y = min_y + height / 2.
 
-        # print('height', height)
-        # print('width', width)
-        # print('center_x', center_x)
-        # print('center_y', center_y)
+        # Assign a grid responsible
+        grid_idx_x = math.floor(center_x / grid_width)
+        grid_idx_y = math.floor(center_y / grid_height)
 
-        grid_idx_x = math.floor(center_x * grid_size) 
-        grid_idx_y = math.floor(center_y * grid_size)
+        # Scale width and height
+        width_scaled = width / IMG_WIDTH
+        height_scaled = height / IMG_HEIGHT
 
-        labels[c][grid_idx_y][grid_idx_x] = np.array([Y[c], center_x, center_y, width, height])
+        # Scale coordinates to be in coordinate system of grid responsible
+        x_start = grid_idx_x * (IMG_WIDTH / grid_size)
+        y_start = grid_idx_y * (IMG_HEIGHT / grid_size)
+        center_x_scaled = (center_x - x_start) / grid_width
+        center_y_scaled = (center_y - y_start) / grid_height
+
+        labels[c][grid_idx_y][grid_idx_x] = np.array([1, center_x_scaled, center_y_scaled, width_scaled, height_scaled])
+
+
+
+        # min_x, min_y = joints.min(axis=0) / np.array([IMG_WIDTH, IMG_HEIGHT])
+        # max_x, max_y = joints.max(axis=0) / np.array([IMG_WIDTH, IMG_HEIGHT])
+        # # print('min_x', min_x)
+        # # print('max_x', max_x)
+        # # print('min_y', min_y)
+        # # print('max_y', max_y)
+
+        # height = max_y - min_y
+        # width = max_x - min_x
+        # center_x = min_x + width / 2.
+        # center_y = min_y + height / 2.
+
+        # # print('height', height)
+        # # print('width', width)
+        # # print('center_x', center_x)
+        # # print('center_y', center_y)
+
+        # # Grid Responsible
+        # grid_idx_x = math.floor(center_x * grid_size) 
+        # grid_idx_y = math.floor(center_y * grid_size)
+
+        # labels[c][grid_idx_y][grid_idx_x] = np.array([Y[c], center_x, center_y, width, height])
 
     return labels
 
@@ -109,7 +119,7 @@ import json
 import numpy as np
 from matplotlib import pyplot as plt
 
-def read_img_data(N, img_height=100, img_width=100):
+def read_img_data(N, img_height=100, img_width=100, print_every=500):
     """
         Inputs:
          N := number of images to read
@@ -152,8 +162,8 @@ def read_img_data(N, img_height=100, img_width=100):
          return X, Y, Joint_Coords, Hand_Info
     """  
 
-    N_pos = N #// 2  # num positive images to read
-    # N_neg = N - N_pos  # num negative images to read
+    N_pos = N // 2  # num positive images to read
+    N_neg = N - N_pos  # num negative images to read
     X = np.zeros((N, img_height, img_width, 3))
     Y = np.zeros((N,))
     Joint_Coords = np.zeros((N, 21, 2))
@@ -165,9 +175,12 @@ def read_img_data(N, img_height=100, img_width=100):
     # Read Positive Images
     img_dir = POS_IMAGES_PATH
     c = 0
-    for item in os.listdir(img_dir):
+    for i, item in enumerate(os.listdir(img_dir)):
         if c >= N_pos:
             break
+
+        if i % print_every == 0:
+            print("Loading Positive Image: ", i)
 
         # Check if left or right hand
         f, ext = os.path.splitext(item)
@@ -196,13 +209,16 @@ def read_img_data(N, img_height=100, img_width=100):
 
     # Read Negative Images
     neg_img_dir = NEG_IMAGES_PATH
-    for item in os.listdir(neg_img_dir):
+    for i, item in enumerate(os.listdir(neg_img_dir)):
         if c >= N:
             break
+
+        if i % print_every == 0:
+            print("Loading Negative Image: ", i)
+
         # Read the image and resize. Store as numpy array.
         neg_img_file = os.path.join(neg_img_dir, item)
         if os.path.isfile(neg_img_file):
-            print(neg_img_file)
             im = Image.open(neg_img_file)
             im_resized = im.resize((img_height, img_width), Image.ANTIALIAS)
             X[c] = np.array(im_resized)
@@ -243,6 +259,19 @@ def split(X, Y, N):
 
 
 ############################# Plotting Functions #########################
+def plot_bounding_box_from_grid(img, grid):
+    s = grid.shape[0] # grid_size
+    img_h, img_w = img.shape[0], img.shape[1]
+    for i in range(s):
+        for j in range(s):
+            if grid[j][i][0] == 1:
+                _, cx, cy, w, h, *_ = grid[j][i]
+                cx = (i+cx)*(img_w/s)
+                cy = (j+cy)*(img_h/s)
+                w = w*img_w
+                h = h*img_h
+                plot_bounding_box(img, cx, cy, w, h)
+
 def plot_bounding_box(img, cx, cy, w, h, hand=None):
     """
     Inputs:
@@ -250,12 +279,11 @@ def plot_bounding_box(img, cx, cy, w, h, hand=None):
         cx, cy, w, h := coordinates of hand and width and height (0,1) scale
         hand := If not none, then either 0 or 1 indicating which hand. 0 for 'left' 1 for 'right'
     """
-    img_h, img_w = img.shape[0], img.shape[1]
-    box_top_left_x, box_top_left_y = (cx-w/2)*img_h, (cy-h/2)*img_h
-    box_h, box_w = h*img_h, w*img_w
+    box_top_left_x, box_top_left_y = (cx-w/2), (cy-h/2)
+    box_h, box_w = h, w
     fig, ax = plt.subplots()
     plt.imshow(img.astype(np.uint8))
-    plt.plot(cx*img_w, cy*img_h, color='g', marker='o', markersize='2')
+    plt.plot(cx, cy, color='g', marker='o', markersize='2')
     r = plt.Rectangle((box_top_left_x, box_top_left_y), box_w, box_h, edgecolor='r', facecolor='none')
     ax.add_artist(r)
 
